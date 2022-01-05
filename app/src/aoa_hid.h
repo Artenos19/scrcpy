@@ -35,7 +35,7 @@ struct sc_aoa {
     sc_thread thread;
     sc_mutex mutex;
     sc_cond event_cond;
-    bool stopped;
+    atomic_bool stopped;
     struct sc_hid_event_queue queue;
 
     struct sc_acksync *acksync;

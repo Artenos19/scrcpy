@@ -149,7 +149,7 @@ sc_aoa_init(struct sc_aoa *aoa, const char *serial,
         return false;
     }
 
-    aoa->stopped = false;
+    atomic_init(&aoa->stopped, false);
     aoa->acksync = acksync;
 
     return true;
@@ -325,10 +325,11 @@ run_aoa_thread(void *data) {
 
     for (;;) {
         sc_mutex_lock(&aoa->mutex);
-        while (!aoa->stopped && cbuf_is_empty(&aoa->queue)) {
+        while (!atomic_load_explicit(&aoa->stopped, memory_order_relaxed) &&
+                cbuf_is_empty(&aoa->queue)) {
             sc_cond_wait(&aoa->event_cond, &aoa->mutex);
         }
-        if (aoa->stopped) {
+        if (atomic_load_explicit(&aoa->stopped, memory_order_relaxed)) {
             // Stop immediately, do not process further events
             sc_mutex_unlock(&aoa->mutex);
             break;
@@ -385,7 +386,7 @@ sc_aoa_start(struct sc_aoa *aoa) {
 void
 sc_aoa_stop(struct sc_aoa *aoa) {
     sc_mutex_lock(&aoa->mutex);
-    aoa->stopped = true;
+    atomic_store_explicit(&aoa->stopped, true, memory_order_relaxed);
     sc_cond_signal(&aoa->event_cond);
     sc_mutex_unlock(&aoa->mutex);
 
