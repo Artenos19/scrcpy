@@ -118,9 +118,55 @@ sc_aoa_open_usb_handle(libusb_device *device, libusb_device_handle **handle) {
     return 0;
 }
 
+static int
+sc_aoa_libusb_callback(libusb_context *ctx, libusb_device *device,
+                       libusb_hotplug_event event, void *userdata) {
+    (void) ctx;
+    (void) device;
+    (void) event;
+
+    struct sc_aoa *aoa = userdata;
+    assert(aoa->cbs && aoa->cbs->on_disconnected);
+    aoa->cbs->on_disconnected(aoa, aoa->cbs_userdata);
+
+    // returning 1 will cause this callback to be deregistered
+    // <https://libusb.sourceforge.io/api-1.0/group__libusb__hotplug.html#ga3d45c3fdf4d2e47a007fe2d9463b3f7f>
+    return 1;
+}
+
+static bool
+sc_aoa_register_callback(struct sc_aoa *aoa) {
+    if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+        LOGW("libusb does not have hotplug capability");
+        return false;
+    }
+
+    struct libusb_device_descriptor desc;
+    if (libusb_get_device_descriptor(aoa->usb_device, &desc)) {
+        LOGW("Could not read USB device descriptor");
+        return false;
+    }
+
+    int events = LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT;
+    int flags = LIBUSB_HOTPLUG_ENUMERATE;
+    int vendor_id = desc.idVendor;
+    int product_id = desc.idProduct;
+    int dev_class = LIBUSB_HOTPLUG_MATCH_ANY;
+    int ret =
+        libusb_hotplug_register_callback(aoa->usb_context, events, flags,
+                                         vendor_id, product_id, dev_class,
+                                         sc_aoa_libusb_callback, aoa, NULL);
+    if (ret) {
+        LOGW("Could not register USB callback");
+        return false;
+    }
+
+    return true;
+}
+
 bool
-sc_aoa_init(struct sc_aoa *aoa, const char *serial,
-            struct sc_acksync *acksync) {
+sc_aoa_init(struct sc_aoa *aoa, const char *serial, struct sc_acksync *acksync,
+            const struct sc_aoa_callbacks *cbs, void *cbs_userdata) {
     assert(acksync);
 
     cbuf_init(&aoa->queue);
@@ -151,6 +197,14 @@ sc_aoa_init(struct sc_aoa *aoa, const char *serial,
 
     atomic_init(&aoa->stopped, false);
     aoa->acksync = acksync;
+
+    // If cbs is set, then cbs->on_disconnected must be set
+    assert(!cbs || cbs->on_disconnected);
+    aoa->cbs = cbs;
+    aoa->cbs_userdata = cbs_userdata;
+    if (cbs && !sc_aoa_register_callback(aoa)) {
+        LOGW("Could not register USB device disconnection callback");
+    }
 
     return true;
 

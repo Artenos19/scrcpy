@@ -466,7 +466,7 @@ scrcpy(struct scrcpy_options *options) {
                 goto end;
             }
 
-            ok = sc_aoa_init(&s->aoa, serial, &s->acksync);
+            ok = sc_aoa_init(&s->aoa, serial, &s->acksync, NULL, NULL);
             if (!ok) {
                 LOGE("Failed to enable HID over AOA");
                 sc_acksync_destroy(&s->acksync);

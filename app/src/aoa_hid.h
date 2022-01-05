@@ -39,10 +39,18 @@ struct sc_aoa {
     struct sc_hid_event_queue queue;
 
     struct sc_acksync *acksync;
+
+    const struct sc_aoa_callbacks *cbs;
+    void *cbs_userdata;
+};
+
+struct sc_aoa_callbacks {
+    void (*on_disconnected)(struct sc_aoa *aoa, void *userdata);
 };
 
 bool
-sc_aoa_init(struct sc_aoa *aoa, const char *serial, struct sc_acksync *acksync);
+sc_aoa_init(struct sc_aoa *aoa, const char *serial, struct sc_acksync *acksync,
+            const struct sc_aoa_callbacks *cbs, void *cbs_userdata);
 
 void
 sc_aoa_destroy(struct sc_aoa *aoa);
