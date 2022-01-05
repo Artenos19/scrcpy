@@ -209,7 +209,7 @@ event_loop(struct scrcpy *s, const struct scrcpy_options *options) {
                 return true;
             case EVENT_RESULT_STOPPED_BY_EOS:
                 LOGW("Device disconnected");
-                return false;
+                break;//return false;
             case EVENT_RESULT_CONTINUE:
                 break;
         }
@@ -309,6 +309,14 @@ sc_server_on_disconnected(struct sc_server *server, void *userdata) {
     LOGD("Server disconnected");
     // Do nothing, the disconnection will be handled by the "stream stopped"
     // event
+}
+
+static void
+sc_aoa_on_disconnected(struct sc_aoa *aoa, void *userdata) {
+    (void) aoa;
+    (void) userdata;
+
+    LOGD("AOA disconnected");
 }
 
 bool
@@ -466,7 +474,10 @@ scrcpy(struct scrcpy_options *options) {
                 goto end;
             }
 
-            ok = sc_aoa_init(&s->aoa, serial, &s->acksync, NULL, NULL);
+            static const struct sc_aoa_callbacks cbs = {
+                .on_disconnected = sc_aoa_on_disconnected,
+            };
+            ok = sc_aoa_init(&s->aoa, serial, &s->acksync, &cbs, &s->aoa);
             if (!ok) {
                 LOGE("Failed to enable HID over AOA");
                 sc_acksync_destroy(&s->acksync);
@@ -632,6 +643,7 @@ aoa_hid_end:
     sc_screen_hide_window(&s->screen);
 
 end:
+    fprintf(stderr, "++++++ end\n");
     // The stream is not stopped explicitly, because it will stop by itself on
     // end-of-stream
 #ifdef HAVE_AOA_HID
@@ -703,6 +715,7 @@ end:
     }
 
     sc_server_destroy(&s->server);
+
 
     return ret;
 }

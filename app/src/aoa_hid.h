@@ -42,6 +42,12 @@ struct sc_aoa {
 
     const struct sc_aoa_callbacks *cbs;
     void *cbs_userdata;
+
+    bool has_callback_handle;
+    libusb_hotplug_callback_handle callback_handle;
+
+    bool has_libusb_event_thread;
+    sc_thread libusb_event_thread;
 };
 
 struct sc_aoa_callbacks {
